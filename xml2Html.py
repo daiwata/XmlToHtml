@@ -56,10 +56,6 @@ ul {
 </html>
 """
 
-"""
-Converts a JSON or YAML object into an HTML string.
-"""
-
 
 def obj2html(obj):
     """
@@ -124,7 +120,7 @@ def find_xml_files(pattern, exclude_patterns):
                         yield os.path.join(root, file)
 
 
-def process_xml_file(xml_file_path, base_directory):
+def process_xml_file(xml_file_path, output_directory, base_input_directory):
     # Function to process a single XML file
     with open(xml_file_path, encoding="UTF-8") as f:
         input_xml_contents = f.read()
@@ -136,11 +132,14 @@ def process_xml_file(xml_file_path, base_directory):
         "!!contents!!", html_contents
     )
 
-    # Creating output file path maintaining the folder structure relative to the base directory
-    relative_path = os.path.relpath(xml_file_path, base_directory)
-    output_file_path = os.path.join(
-        base_directory, os.path.splitext(relative_path)[0] + ".html"
-    )
+    # Determine the output file path, maintaining the input folder structure
+    if output_directory:
+        relative_path = os.path.relpath(xml_file_path, base_input_directory)
+        output_file_path = os.path.join(
+            output_directory, os.path.splitext(relative_path)[0] + ".html"
+        )
+    else:
+        output_file_path = os.path.splitext(xml_file_path)[0] + ".html"
 
     # Creating output directory if it does not exist
     os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
@@ -156,13 +155,21 @@ def main():
         help="Comma-separated list of file or folder names to exclude (supports wildcards)",
         default="",
     )
+    parser.add_argument(
+        "-o", "--output", help="Output directory for HTML files", default=""
+    )
     args = parser.parse_args()
 
     exclude_patterns = args.exclude.split(",") if args.exclude else []
     input_pattern = args.pattern
+    output_directory = args.output if args.output else ""
+
+    base_input_directory = os.path.dirname(
+        os.path.commonprefix(glob.glob(input_pattern, recursive=True))
+    )
 
     for xml_file in find_xml_files(input_pattern, exclude_patterns):
-        process_xml_file(xml_file, os.path.dirname(xml_file))
+        process_xml_file(xml_file, output_directory, base_input_directory)
 
 
 if __name__ == "__main__":
