@@ -104,20 +104,21 @@ def is_excluded(path, exclude_patterns):
     return any(fnmatch.fnmatch(name, pattern) for pattern in exclude_patterns)
 
 
-def find_xml_files(pattern, exclude_patterns):
-    for file_path in glob.glob(pattern, recursive=True):
-        if is_excluded(file_path, exclude_patterns):
-            continue
-        if os.path.isfile(file_path) and file_path.endswith(".xml"):
-            yield file_path
-        elif os.path.isdir(file_path):
-            for root, dirs, files in os.walk(file_path):
-                dirs[:] = [d for d in dirs if not is_excluded(d, exclude_patterns)]
-                for file in files:
-                    if fnmatch.fnmatch(file, "*.xml") and not is_excluded(
-                        file, exclude_patterns
-                    ):
-                        yield os.path.join(root, file)
+def find_xml_files(patterns, exclude_patterns):
+    for pattern in patterns:
+        for file_path in glob.glob(pattern, recursive=True):
+            if is_excluded(file_path, exclude_patterns):
+                continue
+            if os.path.isfile(file_path) and file_path.endswith(".xml"):
+                yield file_path
+            elif os.path.isdir(file_path):
+                for root, dirs, files in os.walk(file_path):
+                    dirs[:] = [d for d in dirs if not is_excluded(d, exclude_patterns)]
+                    for file in files:
+                        if fnmatch.fnmatch(file, "*.xml") and not is_excluded(
+                            file, exclude_patterns
+                        ):
+                            yield os.path.join(root, file)
 
 
 def process_xml_file(xml_file_path, output_directory, base_input_directory):
@@ -149,7 +150,9 @@ def process_xml_file(xml_file_path, output_directory, base_input_directory):
 
 def main():
     parser = argparse.ArgumentParser(description="XML to HTML converter")
-    parser.add_argument("pattern", help="Wildcard pattern for XML files or directories")
+    parser.add_argument(
+        "patterns", nargs="+", help="Wildcard patterns for XML files or directories"
+    )
     parser.add_argument(
         "--exclude",
         help="Comma-separated list of file or folder names to exclude (supports wildcards)",
@@ -161,15 +164,20 @@ def main():
     args = parser.parse_args()
 
     exclude_patterns = args.exclude.split(",") if args.exclude else []
-    input_pattern = args.pattern
+    input_patterns = args.patterns
     output_directory = args.output if args.output else ""
 
-    base_input_directory = os.path.dirname(
-        os.path.commonprefix(glob.glob(input_pattern, recursive=True))
-    )
+    base_input_directories = [
+        os.path.dirname(os.path.commonprefix(glob.glob(pattern, recursive=True)))
+        for pattern in input_patterns
+    ]
 
-    for xml_file in find_xml_files(input_pattern, exclude_patterns):
-        process_xml_file(xml_file, output_directory, base_input_directory)
+    for pattern in input_patterns:
+        base_input_directory = os.path.dirname(
+            os.path.commonprefix(glob.glob(pattern, recursive=True))
+        )
+        for xml_file in find_xml_files([pattern], exclude_patterns):
+            process_xml_file(xml_file, output_directory, base_input_directory)
 
 
 if __name__ == "__main__":
