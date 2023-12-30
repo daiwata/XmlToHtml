@@ -122,30 +122,34 @@ def find_xml_files(patterns, exclude_patterns):
 
 
 def process_xml_file(xml_file_path, output_directory, base_input_directory):
-    # Function to process a single XML file
-    with open(xml_file_path, encoding="UTF-8") as f:
-        input_xml_contents = f.read()
-        dict_data = xmltodict.parse(input_xml_contents)
+    try:
+        with open(xml_file_path, encoding="UTF-8") as f:
+            input_xml_contents = f.read()
+            dict_data = xmltodict.parse(input_xml_contents)
 
-    html_contents = obj2html(dict_data)
-    input_xml_name = os.path.splitext(os.path.basename(xml_file_path))[0]
-    output_html_contents = html_template.replace("!!title!!", input_xml_name).replace(
-        "!!contents!!", html_contents
-    )
+        html_contents = obj2html(dict_data)
+        input_xml_name = os.path.splitext(os.path.basename(xml_file_path))[0]
+        output_html_contents = html_template.replace(
+            "!!title!!", input_xml_name
+        ).replace("!!contents!!", html_contents)
 
-    # Determine the output file path, maintaining the input folder structure
-    if output_directory:
-        relative_path = os.path.relpath(xml_file_path, base_input_directory)
-        output_file_path = os.path.join(
-            output_directory, os.path.splitext(relative_path)[0] + ".html"
-        )
-    else:
-        output_file_path = os.path.splitext(xml_file_path)[0] + ".html"
+        # Determine the output file path, maintaining the input folder structure
+        if output_directory:
+            relative_path = os.path.relpath(xml_file_path, base_input_directory)
+            output_file_path = os.path.join(
+                output_directory, os.path.splitext(relative_path)[0] + ".html"
+            )
+        else:
+            output_file_path = os.path.splitext(xml_file_path)[0] + ".html"
 
-    # Creating output directory if it does not exist
-    os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
-    with open(output_file_path, "w", encoding="UTF-8") as f:
-        f.write(output_html_contents)
+        # Creating output directory if it does not exist
+        os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
+        with open(output_file_path, "w", encoding="UTF-8") as f:
+            f.write(output_html_contents)
+        return True
+    except Exception as e:
+        print(f"Failed to convert {xml_file_path}: {e}")
+        return False
 
 
 def main():
@@ -167,17 +171,24 @@ def main():
     input_patterns = args.patterns
     output_directory = args.output if args.output else ""
 
-    base_input_directories = [
-        os.path.dirname(os.path.commonprefix(glob.glob(pattern, recursive=True)))
-        for pattern in input_patterns
-    ]
+    total_files = 0
+    successful_conversions = 0
+    failed_conversions = 0
 
     for pattern in input_patterns:
         base_input_directory = os.path.dirname(
             os.path.commonprefix(glob.glob(pattern, recursive=True))
         )
         for xml_file in find_xml_files([pattern], exclude_patterns):
-            process_xml_file(xml_file, output_directory, base_input_directory)
+            total_files += 1
+            if process_xml_file(xml_file, output_directory, base_input_directory):
+                successful_conversions += 1
+            else:
+                failed_conversions += 1
+
+    print(
+        f"Total: {total_files} / Success: {successful_conversions} / Failed: {failed_conversions}"
+    )
 
 
 if __name__ == "__main__":
